@@ -78,11 +78,17 @@ void Initialize_UART1(){
 
 void test_UART()
 {
+	int i =0; 
 	 while(1){
 	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
 	 if ((R && 0x0002)== 0x0){
 	 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-	 SendChar(C);
+	while (array[i]!= NULL)
+	 {
+		 array[i] = C;
+		 i=i+1;
+	 }
+	 }
 	 }
 	 }
 }
