@@ -23,10 +23,12 @@
 #define GPIO_INT_ANY_1 0xE000A264 // Interrupt any edge sensitive bank 1
 #define MIO_PIN_16 0xF8000740
 #define UART_INT_DIS (0xE0001000 + 0x0C)
+#define UART_RxFIFO_Trigger 0xE0001020
 #define UART_Priority_Reg 0xF8F01450
 #define UART_Processor_Target_Reg 0xF8F01850
 #define UART_Set_En 0xF8F01108
 #define UART_Config_Reg 0xF8F01C14
+#define UART_ISR 0xE0001014
 #define MIO_PIN_17 0xF8000744
 #define MIO_PIN_18 0xF8000748
 #define MIO_PIN_50 0xF80007C8
@@ -36,7 +38,12 @@
 #define GPIO_DIRM_1 0xE000A244 // Direction mode bank 1
 #define LED_Base_Address 0x4BB00000
 # define BTN_Base_Address 0x4BB02004
-
+#define SVN_SEG_CTRL 0X4BB03000
+#define DIG1_ADDRESS (0X4BB03000 + 4)
+#define DIG2_ADDRESS (0X4BB03000 + 8)
+#define DIG3_ADDRESS (0X4BB03000 + 12)
+#define DIG4_ADDRESS (0X4BB03000 + 16)
+#define SVN_SEG_DP (0X4BB03000 + 20)
 //lab specific registers
 #define UART1_CON_Addr 0xE0001000
 #define UART_INT_EN (0xE0001000 + 0x08)
@@ -58,25 +65,36 @@
 
 
 void Initialize_UART1();
+void Initialize_SVD();
 void SendChar(uint8_t C);
 void configure_GIC();
 char array[35];
-char array1[35] ={0};
 void turnOnLED();
 void enable_interrupts();
 void disable_interrupts();
 void IRQ_Handler(void *data);
+void turnOffLED();
+uint8_t D1 =0;
+uint8_t D2 =0;
+uint8_t D3 =0;
+uint8_t D4 =0;
 
 int main()
 {
 
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
 	Initialize_UART1();
+	Initialize_SVD();
 	disable_interrupts();
 	configure_GIC();
+	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);
 	enable_interrupts();
-	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);// build-in
-		 return 0;
+	while (1)
+	{
+		;
+	}
+	// build-in
+	return 0;
 }
 
 //configure button 4/5 as inputs and LED8 as the output
@@ -103,11 +121,14 @@ void Initialize_UART1(){
 *((uint32_t*) UART1_CON_Addr) = 0x0000000; // disable transmitter and receiver
 *((uint32_t*) UART1_Buad_Gen_Addr) = 0x7C; // Baud Gen
 *((uint32_t*) UART1_Baud_DIV_Addr) = 0x6; // Baud Divider
-*((uint32_t*) UART1_CON_Addr) = 0x0000117; // disable transmitter and receiver
+*((uint32_t*) UART1_CON_Addr) = 0x0000157; // disable transmitter and receiver
 // Normal mode, single stop bit, no parity 8 bits data
+*((uint32_t*)UART_RxFIFO_Trigger) = 0x1; //shown in Reference document,
+// (in line above) trigger set when receiver fifo fills to the # of bytes specified
 *((uint32_t*) UART1_Mode_Addr) = 0x0000030;
 *((uint32_t*) UART1_INT_DIS_Addr) = 0x000FFFF; // Disable interrupt
-*((uint32_t*) UART1_RT_Addr) = 0xFF; // Reciever Time out
+*((uint32_t*)UART1_FIFO_Addr) = 0x1;
+*((uint32_t*) UART1_RT_Addr) = 0x1; // Reciever Time out
 *((uint32_t*) UART_INT_DIS) = 0xFEFE; //this enablese the receiver overflow interrupt
 *((uint32_t*) UART_INT_EN) = 0x101;
 
@@ -121,7 +142,7 @@ void test_UART()
 	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
 	 if ((R && 0x0002)== 0x0){
 	 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-	 while (array1[i]!= ";")
+	 while (array[i]!= ";")
 	 {
 		 array[i] = C;
 		 i=i+1;
@@ -139,26 +160,38 @@ void IRQ_Handler(void *data)
 uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 	if (interrupt_ID == 82) //checking if the interrupt is from the UART
 	{
-		int i = 0;
-		int j = 0;
-			 while(1){
-			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
-			 if ((R && 0x0002)== 0x0){
-			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-			 while (array1[i]!= ";")
-			 {
-				 array[i] = C;
-				 i=i+1;
-			 }
-			 }
-			 }
-			 j = strncmp(array, "LED", 7);
-			 if (j == 0)
-			 {
-				 turnOnLED();
-			 }
+//		int i = 0;
+//		int j = 0;
+//			 while(1){
+//			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+//			 if ((R && 0x0002)== 0x0){
+//			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+//			 while (array[i]!= ";")
+//			 {
+//				 array[i] = C;
+//				 i=i+1;
+////			 }
+//			 }
+//			 }
+//			 j = strncmp(array, "LED", 7);
+//			 if (j == 0)
+//			 {
+				 //turnOnLED();
+		 D1++;
+	//}
 	}
+
+//*((uint32_t*)DIG1_ADDRESS) = D1;
+*((uint32_t*)UART_ISR) = 0xFFFFFF; //resetting the Interrupt Status Register so it clears interrupts
+*((uint32_t*)UART1_RT_Addr) = 0xFFFFFF; //resetting the Reset Timeout for UART
 *((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+
+}
+
+void turnOffLED(){
+*((uint32_t*) LED_Base_Address) = 0x00000000;
+*((uint32_t*) LED_Base_Address+1) = 0x00000000;
+return;
 }
 
 void turnOnLED(){
@@ -186,5 +219,20 @@ void disable_interrupts()
 	__asm__ __volatile__("mrs %0, cpsr\n" : "=r" (read_cpsr) ); // execute the assembly instruction MSR
 	__asm__ __volatile__("msr cpsr,%0\n" : : "r" ((read_cpsr & (~bit_mask))| mode)); // only change the
 	//lower 8 bits
+	return;
+}
+void Initialize_SVD()
+{
+	*((uint32_t*)SVN_SEG_CTRL) = 0x9;
+	*((uint32_t*)DIG1_ADDRESS) = 0x0;
+	*((uint32_t*)DIG2_ADDRESS) = 0x0;
+	*((uint32_t*)DIG3_ADDRESS) = 0x0;
+	*((uint32_t*)DIG4_ADDRESS) = 0x0;
+	*((uint32_t*)SVN_SEG_DP) = 0x1;
+	*((uint32_t*)D1) =0;
+	*((uint32_t*)D2) =0;
+	*((uint32_t*)D3) =0;
+	*((uint32_t*)D4) =0;
+	//I think I need to add some code here that
 	return;
 }
