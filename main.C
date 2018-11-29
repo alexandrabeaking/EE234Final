@@ -2,6 +2,7 @@
 #include "platform.h"
 #include "xil_printf.h"
 #include "xil_exception.h"
+#include "string.h"
 #define ICCPMR_BASEADDR 0xF8F00104 // Interrupt Priority Mask Register
 #define ICCICR_BASEADDR 0xF8F00100 // CPU Interface Control Register
 #define ICDDCR_BASEADDR 0xF8F01000 // Distributor Control Register
@@ -22,8 +23,10 @@
 #define GPIO_INT_ANY_1 0xE000A264 // Interrupt any edge sensitive bank 1
 #define MIO_PIN_16 0xF8000740
 #define UART_INT_DIS (0xE0001000 + 0x0C)
-#define UART_Priority_Reg (0xF8F00000 + 0x1450)
-#define UART_Config_Reg ((0xF8F00000 + 0x1C14)
+#define UART_Priority_Reg 0xF8F01450
+#define UART_Processor_Target_Reg 0xF8F01850
+#define UART_Set_En 0xF8F01108
+#define UART_Config_Reg 0xF8F01C14
 #define MIO_PIN_17 0xF8000744
 #define MIO_PIN_18 0xF8000748
 #define MIO_PIN_50 0xF80007C8
@@ -31,6 +34,8 @@
 #define GPIO_DIRM_0 0xE000A204 // Direction mode bank 0
 #define GPIO_OUTE_0 0xE000A208 // Output enable bank 0
 #define GPIO_DIRM_1 0xE000A244 // Direction mode bank 1
+#define LED_Base_Address 0x4BB00000
+# define BTN_Base_Address 0x4BB02004
 
 //lab specific registers
 #define UART1_CON_Addr 0xE0001000
@@ -56,6 +61,8 @@ void Initialize_UART1();
 void SendChar(uint8_t C);
 void configure_GIC();
 char array[35];
+void turnOnLED();
+void IRQ_Handler(void *data);
 
 int main()
 {
@@ -66,12 +73,15 @@ int main()
 		 return 0;
 }
 
-//configure button 4/5 as inputs and LED8 as the outpu
-void configure_GIC(){
+//configure button 4/5 as inputs and LED8 as the output
+void configure_GIC()
+{
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000000;
 *((uint32_t*) ICDICER_BASEADDR+1) = 0x00000000;
-*((uint32_t*) UART_Priority_Reg) = 0x00B00000; // this will do interrupt id#82, ICDIPR20 in BBPR
-*((uint32_t*) UART_Config_Reg) = 0x0010000;
+*((uint32_t*) UART_Priority_Reg) = 0x00B00000; //sets priority for ID #82
+*((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, high-level active
+*((uint32_t*) UART_Processor_Target_Reg) = 0x0010000; //this sets the target as CPU0
+*((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64
 *((uint32_t*) ICDDCR_BASEADDR) = 0x0;
 *((uint32_t*) ICDIPR_BASEADDR+13) = 0x000000A0;
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000001;
@@ -99,6 +109,7 @@ void Initialize_UART1(){
 
 void test_UART()
 {
+	//needs to be in IRQ handler
 	int i =0;
 	 while(1){
 	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
@@ -115,5 +126,38 @@ void test_UART()
 
 void SendChar(uint8_t C){
 *((uint32_t*) UART1_FIFO_Addr) = C; // Disable interrupt
+}
+
+void IRQ_Handler(void *data)
+{
+uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
+	if (interrupt_ID == 82) //checking if the interrupt is from the UART
+	{
+		int i = 0;
+		int j = 0;
+			 while(1){
+			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+			 if ((R && 0x0002)== 0x0){
+			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+			 while (array[i]!= ";")
+			 {
+				 array[i] = C;
+				 i=i+1;
+			 }
+			 }
+			 }
+			 j = strncmp(array, "LEDx ON", 7);
+			 if (j == 0)
+			 {
+				 turnOnLED();
+			 }
+	}
+*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+}
+
+void turnOnLED(){
+*((uint32_t*) LED_Base_Address) = 0x0000000F;
+*((uint32_t*) LED_Base_Address+1) = 0x0000000F;
+return;
 }
 
