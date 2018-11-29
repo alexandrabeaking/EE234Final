@@ -61,15 +61,21 @@ void Initialize_UART1();
 void SendChar(uint8_t C);
 void configure_GIC();
 char array[35];
+char array1[35] ={0};
 void turnOnLED();
+void enable_interrupts();
+void disable_interrupts();
 void IRQ_Handler(void *data);
 
 int main()
 {
 
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
-	configure_GIC();
 	Initialize_UART1();
+	disable_interrupts();
+	configure_GIC();
+	enable_interrupts();
+	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);// build-in
 		 return 0;
 }
 
@@ -115,7 +121,7 @@ void test_UART()
 	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
 	 if ((R && 0x0002)== 0x0){
 	 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-	 while (array[i]!= ";")
+	 while (array1[i]!= ";")
 	 {
 		 array[i] = C;
 		 i=i+1;
@@ -139,14 +145,14 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
 			 if ((R && 0x0002)== 0x0){
 			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-			 while (array[i]!= ";")
+			 while (array1[i]!= ";")
 			 {
 				 array[i] = C;
 				 i=i+1;
 			 }
 			 }
 			 }
-			 j = strncmp(array, "LEDx ON", 7);
+			 j = strncmp(array, "LED", 7);
 			 if (j == 0)
 			 {
 				 turnOnLED();
@@ -161,3 +167,24 @@ void turnOnLED(){
 return;
 }
 
+void enable_interrupts(){
+uint32_t read_cpsr=0; // used to read previous CPSR value
+uint32_t mode = 0x5F; // System mode [4:0] and IRQ enabled [7]
+uint32_t bit_mask = 0xFF; // used to clear bottom 8 bits
+__asm__ __volatile__("mrs %0, cpsr\n" : "=r" (read_cpsr) );
+__asm__ __volatile__("msr cpsr,%0\n" : : "r" ((read_cpsr & (~bit_mask))| mode));
+return;
+}
+
+void disable_interrupts()
+{
+
+	uint32_t mode = 0xDF; // System mode [4:0] and IRQ disabled [7], D == 1101, F == 1111
+	//what does this mean???
+	uint32_t read_cpsr=0; // used to read previous CPSR value, read status register values
+	uint32_t bit_mask = 0xFF; // used to clear bottom 8 bits
+	__asm__ __volatile__("mrs %0, cpsr\n" : "=r" (read_cpsr) ); // execute the assembly instruction MSR
+	__asm__ __volatile__("msr cpsr,%0\n" : : "r" ((read_cpsr & (~bit_mask))| mode)); // only change the
+	//lower 8 bits
+	return;
+}
