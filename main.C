@@ -67,6 +67,7 @@
 void Initialize_UART1();
 void Initialize_SVD();
 void SendChar(uint8_t C);
+void delay(int i);
 void configure_GIC();
 char array[35];
 void turnOnLED();
@@ -84,7 +85,6 @@ int main()
 
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
 	Initialize_UART1();
-	Initialize_SVD();
 	disable_interrupts();
 	configure_GIC();
 	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);
@@ -157,33 +157,33 @@ void SendChar(uint8_t C){
 
 void IRQ_Handler(void *data)
 {
+
+	int i = 0; //buys time for FIFO to fill
+	delay(1000);
+//bit wise and it with two
 uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 	if (interrupt_ID == 82) //checking if the interrupt is from the UART
 	{
-//		int i = 0;
-//		int j = 0;
-//			 while(1){
-//			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
-//			 if ((R && 0x0002)== 0x0){
-//			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-//			 while (array[i]!= ";")
-//			 {
-//				 array[i] = C;
-//				 i=i+1;
-////			 }
-//			 }
-//			 }
-//			 j = strncmp(array, "LED", 7);
-//			 if (j == 0)
-//			 {
-				 //turnOnLED();
-		 D1++;
-	//}
-	}
+//
+			// while((*((uint32_t*) UART1_C_Stat_Addr)) != 8){
+			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+			 while ((R & 0x0002)== 0x0)
+			 {
+				 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+								 if (C >= 32)
+								 {
+									 SendChar(C);
+									 array[i] = C;
+									 i=i+1;
+								 }
+								 check();
 
-//*((uint32_t*)DIG1_ADDRESS) = D1;
+			 }
+
+			 }
+
 *((uint32_t*)UART_ISR) = 0xFFFFFF; //resetting the Interrupt Status Register so it clears interrupts
-*((uint32_t*)UART1_RT_Addr) = 0xFFFFFF; //resetting the Reset Timeout for UART
+//*((uint32_t*)UART1_RT_Addr) = 0xFFFFFF; //resetting the Reset Timeout for UART
 *((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
 
 }
@@ -199,6 +199,21 @@ void turnOnLED(){
 *((uint32_t*) LED_Base_Address+1) = 0x0000000F;
 return;
 }
+
+void check()
+{
+
+	if ((strncmp(array, "LED;", 4)) == 0)
+	{
+		Initialize_SVD();
+	}
+	else
+	{
+		//turnOnLED();
+	}
+
+}
+
 
 void enable_interrupts(){
 uint32_t read_cpsr=0; // used to read previous CPSR value
@@ -221,6 +236,7 @@ void disable_interrupts()
 	//lower 8 bits
 	return;
 }
+
 void Initialize_SVD()
 {
 	*((uint32_t*)SVN_SEG_CTRL) = 0x9;
@@ -236,3 +252,11 @@ void Initialize_SVD()
 	//I think I need to add some code here that
 	return;
 }
+
+void delay(int i)
+{
+int k = 0;
+while (k<i)
+k++;
+}
+
