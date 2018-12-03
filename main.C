@@ -67,14 +67,17 @@
 void Initialize_UART1();
 void Initialize_SVD();
 void SendChar(uint8_t C);
-void delay(int i);
+void delay(int j);
 void configure_GIC();
 char array[35];
-void turnOnLED();
+int i = 0;
+int turnOnLED();
 void enable_interrupts();
 void disable_interrupts();
 void IRQ_Handler(void *data);
 void turnOffLED();
+void checkLEDON();
+void checkLEDOFF();
 uint8_t D1 =0;
 uint8_t D2 =0;
 uint8_t D3 =0;
@@ -86,6 +89,7 @@ int main()
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
 	Initialize_UART1();
 	disable_interrupts();
+	Initialize_SVD();
 	configure_GIC();
 	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);
 	enable_interrupts();
@@ -103,7 +107,7 @@ void configure_GIC()
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000000;
 *((uint32_t*) ICDICER_BASEADDR+1) = 0x00000000;
 *((uint32_t*) UART_Priority_Reg) = 0x00B00000; //sets priority for ID #82
-*((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, high-level active
+*((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, rising edge active
 *((uint32_t*) UART_Processor_Target_Reg) = 0x0010000; //this sets the target as CPU0
 *((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64
 *((uint32_t*) ICDDCR_BASEADDR) = 0x0;
@@ -134,22 +138,6 @@ void Initialize_UART1(){
 
 }
 
-void test_UART()
-{
-	//needs to be in IRQ handler
-	int i =0;
-	 while(1){
-	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
-	 if ((R && 0x0002)== 0x0){
-	 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-	 while (array[i]!= ";")
-	 {
-		 array[i] = C;
-		 i=i+1;
-	 }
-	 }
-	 }
-}
 
 void SendChar(uint8_t C){
 *((uint32_t*) UART1_FIFO_Addr) = C; // Disable interrupt
@@ -158,28 +146,42 @@ void SendChar(uint8_t C){
 void IRQ_Handler(void *data)
 {
 
-	int i = 0; //buys time for FIFO to fill
-	delay(1000);
+	 //buys time for FIFO to fill
+
 //bit wise and it with two
 uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 	if (interrupt_ID == 82) //checking if the interrupt is from the UART
 	{
+
+		//int z =0;
 //
+
 			// while((*((uint32_t*) UART1_C_Stat_Addr)) != 8){
 			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
-			 while ((R & 0x0002)== 0x0)
+			 while (((R & 0x0002) == 0x0)) //if the FIFO is not empty >> //prolly a while
 			 {
+				 delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
 				 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-								 if (C >= 32)
+								 if (C >= 32 && C!= ';')
 								 {
-									 SendChar(C);
-									 array[i] = C;
-									 i=i+1;
+									//SendChar(C);
+									array[i] = C;
+									i++;
 								 }
-								 check();
+
+
+								  //D1++;
+								 // (*((uint32_t*)DIG1_ADDRESS)) = D1;
+
 
 			 }
+			 //have a feeling that it doesn't store in the array correctly because it doesn't echo back
+			 for(int w =0; w <= i; w++)
+			 	{
+			 		SendChar(array[w]);
 
+			 	}
+			 checkLEDON();
 			 }
 
 *((uint32_t*)UART_ISR) = 0xFFFFFF; //resetting the Interrupt Status Register so it clears interrupts
@@ -194,24 +196,49 @@ void turnOffLED(){
 return;
 }
 
-void turnOnLED(){
+int turnOnLED(){
 *((uint32_t*) LED_Base_Address) = 0x0000000F;
 *((uint32_t*) LED_Base_Address+1) = 0x0000000F;
-return;
+return 1;
 }
 
-void check()
-{
 
-	if ((strncmp(array, "LED;", 4)) == 0)
+void checkLEDON()
+{
+//	turnOnLED();
+//	uint32_t T = 13;
+//	SendChar(T);
+//	//int w;
+
+
+	if ((strncmp(array, "LED", 3)) == 0)
 	{
-		Initialize_SVD();
+		D1++;
+		(*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+	}
+	else if (((strncmp(array, "LEDx OFF;", 9) == 0))) //&& (turnOnLED() == 1)))
+	{
+		turnOffLED();
+	}
+
+		//send echo command that this is not valid
+
+	 i = 0;
+	 return;
+}
+
+void checkLEDOFF(int z)
+{
+	if(z == 1 && ((strncmp(array, "LEDx OFF;", 9)) == 0))
+	{
+		turnOffLED();
+		return;
 	}
 	else
 	{
-		//turnOnLED();
+		return;
 	}
-
 }
 
 
@@ -259,4 +286,3 @@ int k = 0;
 while (k<i)
 k++;
 }
-
