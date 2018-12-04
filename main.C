@@ -71,8 +71,14 @@ void delay(int j);
 void configure_GIC();
 char array[35];
 int i = 0;
-int turnOnLED();
+int turnOnLED1();
+int turnOnLED2();
+int turnOnLED4();
+int turnOnLED3();
+void turnOffLED1();
+//int turnOnLED();
 void enable_interrupts();
+void UnInitialize_SVD();
 void disable_interrupts();
 void IRQ_Handler(void *data);
 void turnOffLED();
@@ -89,7 +95,7 @@ int main()
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
 	Initialize_UART1();
 	disable_interrupts();
-	Initialize_SVD();
+	//Initialize_SVD();
 	configure_GIC();
 	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);
 	enable_interrupts();
@@ -109,7 +115,7 @@ void configure_GIC()
 *((uint32_t*) UART_Priority_Reg) = 0x00B00000; //sets priority for ID #82
 *((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, rising edge active
 *((uint32_t*) UART_Processor_Target_Reg) = 0x0010000; //this sets the target as CPU0
-*((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64
+*((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64, ICDICER2
 *((uint32_t*) ICDDCR_BASEADDR) = 0x0;
 *((uint32_t*) ICDIPR_BASEADDR+13) = 0x000000A0;
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000001;
@@ -162,11 +168,16 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 			 {
 				 delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
 				 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
-								 if (C >= 32 && C!= ';')
+								 if (C >= 32)
 								 {
 									//SendChar(C);
 									array[i] = C;
+									SendChar(array[i]); //proves that it's storing in the array correctly
 									i++;
+								 }
+								 if (C == ';')
+								 {
+									 checkLEDON();
 								 }
 
 
@@ -176,13 +187,15 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 
 			 }
 			 //have a feeling that it doesn't store in the array correctly because it doesn't echo back
-			 for(int w =0; w <= i; w++)
-			 	{
-			 		SendChar(array[w]);
+			 //does this even do what it's meant to?
+//			 for(int w =0; w <= i; w++)
+//			 	{
+//			 		SendChar(array[w]);
+//
+//			 	}
 
-			 	}
-			 checkLEDON();
 			 }
+	//if(interrupt_ID == )
 
 *((uint32_t*)UART_ISR) = 0xFFFFFF; //resetting the Interrupt Status Register so it clears interrupts
 //*((uint32_t*)UART1_RT_Addr) = 0xFFFFFF; //resetting the Reset Timeout for UART
@@ -190,37 +203,90 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 
 }
 
-void turnOffLED(){
+void turnOffLED1(){
 *((uint32_t*) LED_Base_Address) = 0x00000000;
 *((uint32_t*) LED_Base_Address+1) = 0x00000000;
 return;
 }
 
-int turnOnLED(){
-*((uint32_t*) LED_Base_Address) = 0x0000000F;
-*((uint32_t*) LED_Base_Address+1) = 0x0000000F;
+int turnOnLED1(){
+*((uint32_t*) LED_Base_Address) = 0x00000001;
+*((uint32_t*) LED_Base_Address+1) = 0x00000001;
 return 1;
 }
 
+int turnOnLED2()
+{
+	*((uint32_t*) LED_Base_Address) = 0x00000002;
+	*((uint32_t*) LED_Base_Address+1) = 0x00000002;
+	return 1;
+}
+
+int turnOnLED3()
+{
+	*((uint32_t*) LED_Base_Address) = 0x00000004;
+	*((uint32_t*) LED_Base_Address+1) = 0x00000004;
+	return 1;
+}
+
+int turnOnLED4()
+{
+	*((uint32_t*) LED_Base_Address) = 0x00000008;
+	*((uint32_t*) LED_Base_Address+1) = 0x00000008;
+	return 1;
+}
 
 void checkLEDON()
 {
-//	turnOnLED();
-//	uint32_t T = 13;
-//	SendChar(T);
-//	//int w;
-
-
-	if ((strncmp(array, "LED", 3)) == 0)
+	//turnOnLED();
+	if ((strncmp(array, ">>LED1 ON;", strlen(">>LED1 ON;"))) == 0)
 	{
-		D1++;
-		(*((uint32_t*)DIG1_ADDRESS)) = D1;
+//		D1++;
+//		(*((uint32_t*)DIG1_ADDRESS)) = D1;
+		turnOnLED1();
 
 	}
-	else if (((strncmp(array, "LEDx OFF;", 9) == 0))) //&& (turnOnLED() == 1)))
+	else if((strncmp(array, ">>LED2 ON;", strlen(">>LED2 ON;"))) == 0)
 	{
-		turnOffLED();
+		turnOnLED2();
 	}
+	else if((strncmp(array, ">>LED3 ON;", strlen(">>LED3 ON;"))) == 0)
+	{
+		turnOnLED3();
+	}
+	else if((strncmp(array, ">>LED4 ON;", strlen(">>LED4 ON;"))) == 0)
+	{
+		turnOnLED4();
+	}
+	else if(((strncmp(array, ">>LED1 OFF;", strlen(">>LED1 OFF;"))) == 0) && (turnOnLED1() == 1))
+	{
+		turnOffLED1();
+	}
+	else if(((strncmp(array, ">>LED2 OFF;", strlen(">>LED2 OFF;"))) == 0) && (turnOnLED1() == 1))
+	{
+		turnOffLED1();
+	}
+	else if(((strncmp(array, ">>LED3 OFF;", strlen(">>LED3 OFF;"))) == 0) && (turnOnLED1() == 1))
+	{
+		turnOffLED1();
+	}
+	else if(((strncmp(array, ">>LED4 OFF;", strlen(">>LED4 OFF;"))) == 0) && (turnOnLED1() == 1))
+	{
+		turnOffLED1();
+	}
+	else if((strncmp(array, ">>SVD ON;", strlen(">>SVD ON;"))) == 0)
+	{
+		Initialize_SVD();
+	}
+	else if((strncmp(array, ">>SVD OFF;", strlen(">>SVD OFF;"))) == 0)
+	{
+		UnInitialize_SVD();
+	}
+//	else if (((strncmp(array, "LEDx OFF;", 9) == 0))) //&& (turnOnLED() == 1)))
+//	{
+//		turnOffLED();
+//	}
+
 
 		//send echo command that this is not valid
 
@@ -232,7 +298,7 @@ void checkLEDOFF(int z)
 {
 	if(z == 1 && ((strncmp(array, "LEDx OFF;", 9)) == 0))
 	{
-		turnOffLED();
+		turnOffLED1();
 		return;
 	}
 	else
@@ -271,13 +337,29 @@ void Initialize_SVD()
 	*((uint32_t*)DIG2_ADDRESS) = 0x0;
 	*((uint32_t*)DIG3_ADDRESS) = 0x0;
 	*((uint32_t*)DIG4_ADDRESS) = 0x0;
-	*((uint32_t*)SVN_SEG_DP) = 0x1;
+	//*((uint32_t*)SVN_SEG_DP) = 0x1;
 	*((uint32_t*)D1) =0;
 	*((uint32_t*)D2) =0;
 	*((uint32_t*)D3) =0;
 	*((uint32_t*)D4) =0;
 	//I think I need to add some code here that
 	return;
+}
+
+void UnInitialize_SVD()
+{
+	*((uint32_t*)SVN_SEG_CTRL) = 0x0;
+	*((uint32_t*)DIG1_ADDRESS) = 0x0;
+	*((uint32_t*)DIG2_ADDRESS) = 0x0;
+	*((uint32_t*)DIG3_ADDRESS) = 0x0;
+	*((uint32_t*)DIG4_ADDRESS) = 0x0;
+		//*((uint32_t*)SVN_SEG_DP) = 0x1;
+		*((uint32_t*)D1) =0;
+		*((uint32_t*)D2) =0;
+		*((uint32_t*)D3) =0;
+		*((uint32_t*)D4) =0;
+		//I think I need to add some code here that
+		return;
 }
 
 void delay(int i)
