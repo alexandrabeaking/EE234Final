@@ -22,6 +22,10 @@
 #define GPIO_INT_POL_1 0xE000A260 // Interrupt polarity bank 1
 #define GPIO_INT_ANY_1 0xE000A264 // Interrupt any edge sensitive bank 1
 #define MIO_PIN_16 0xF8000740
+//#define MIO_PIN_17 0xF8000744
+//#define MIO_PIN_18 0xF8000748
+//#define MIO_PIN_50 0xF80007C8
+//#define MIO_PIN_51 0xF80007CC
 #define UART_INT_DIS (0xE0001000 + 0x0C)
 #define UART_RxFIFO_Trigger 0xE0001020
 #define UART_Priority_Reg 0xF8F01450
@@ -36,6 +40,7 @@
 #define GPIO_DIRM_0 0xE000A204 // Direction mode bank 0
 #define GPIO_OUTE_0 0xE000A208 // Output enable bank 0
 #define GPIO_DIRM_1 0xE000A244 // Direction mode bank 1
+#define GPIO_INT_STAT_1 0xE000A258 // Interrupt status bank 1
 #define LED_Base_Address 0x4BB00000
 # define BTN_Base_Address 0x4BB02004
 #define SVN_SEG_CTRL 0X4BB03000
@@ -71,15 +76,19 @@ void delay(int j);
 void configure_GIC();
 char array[35];
 int i = 0;
+void Initialize_GPIO_Interrupts();
 int turnOnLED1();
+void Configure_IO();
 int turnOnLED2();
 int turnOnLED4();
 int turnOnLED3();
+void MyGPIOIRQHandler(void *data);
 void turnOffLED1();
 //int turnOnLED();
 void enable_interrupts();
 void UnInitialize_SVD();
 void disable_interrupts();
+void ButtonHandler(uint32_t button_press);
 void IRQ_Handler(void *data);
 void turnOffLED();
 void checkLEDON();
@@ -95,8 +104,10 @@ int main()
 	init_platform(); //initializes the platform, in the "platform.h" file, configures the UART
 	Initialize_UART1();
 	disable_interrupts();
+	Configure_IO();
 	//Initialize_SVD();
 	configure_GIC();
+	Initialize_GPIO_Interrupts();
 	Xil_ExceptionRegisterHandler(5, IRQ_Handler, NULL);
 	enable_interrupts();
 	while (1)
@@ -112,10 +123,6 @@ void configure_GIC()
 {
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000000;
 *((uint32_t*) ICDICER_BASEADDR+1) = 0x00000000;
-*((uint32_t*) UART_Priority_Reg) = 0x00B00000; //sets priority for ID #82
-*((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, rising edge active
-*((uint32_t*) UART_Processor_Target_Reg) = 0x0010000; //this sets the target as CPU0
-*((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64, ICDICER2
 *((uint32_t*) ICDDCR_BASEADDR) = 0x0;
 *((uint32_t*) ICDIPR_BASEADDR+13) = 0x000000A0;
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000001;
@@ -124,6 +131,11 @@ void configure_GIC()
 *((uint32_t*) ICCPMR_BASEADDR) = 0xFF;
 *((uint32_t*) ICCICR_BASEADDR) = 0x3;
 *((uint32_t*) ICDDCR_BASEADDR) = 0x1;
+
+*((uint32_t*) UART_Priority_Reg) = 0x00B00000; //sets priority for ID #82
+*((uint32_t*) UART_Config_Reg) = 0x0000000C; //Configures interrupt for ID #82, rising edge active
+*((uint32_t*) UART_Processor_Target_Reg) = 0x0010000; //this sets the target as CPU0
+*((uint32_t*) UART_Set_En) = 0xFFFFFFFF;//writing a set enable for ID: 95-64, ICDICER2
 return;
 }
 
@@ -164,9 +176,9 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 
 			// while((*((uint32_t*) UART1_C_Stat_Addr)) != 8){
 			 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
-			 while (((R & 0x0002) == 0x0)) //if the FIFO is not empty >> //prolly a while
+			 if (((R & 0x0002) != 0x2)) //if the FIFO is not empty >> //prolly a while
 			 {
-				 delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
+				 //delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
 				 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
 								 if (C >= 32)
 								 {
@@ -186,16 +198,9 @@ uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
 
 
 			 }
-			 //have a feeling that it doesn't store in the array correctly because it doesn't echo back
-			 //does this even do what it's meant to?
-//			 for(int w =0; w <= i; w++)
-//			 	{
-//			 		SendChar(array[w]);
-//
-//			 	}
+
 
 			 }
-	//if(interrupt_ID == )
 
 *((uint32_t*)UART_ISR) = 0xFFFFFF; //resetting the Interrupt Status Register so it clears interrupts
 //*((uint32_t*)UART1_RT_Addr) = 0xFFFFFF; //resetting the Reset Timeout for UART
@@ -239,6 +244,7 @@ int turnOnLED4()
 void checkLEDON()
 {
 	//turnOnLED();
+	int v =0;
 	if ((strncmp(array, ">>LED1 ON;", strlen(">>LED1 ON;"))) == 0)
 	{
 //		D1++;
@@ -303,10 +309,34 @@ void checkLEDON()
 		D4++;
 		(*((uint32_t*)DIG4_ADDRESS)) = D4;
 	}
-//	else if (((strncmp(array, "LEDx OFF;", 9) == 0))) //&& (turnOnLED() == 1)))
-//	{
-//		turnOffLED();
-//	}
+	else if((strncmp(array, ">> RESET DIGIT1;", strlen(">> RESET DIGIT1;"))) == 0)
+	{
+		D1 = 0;
+		(*((uint32_t*)DIG1_ADDRESS)) = D1;
+	}
+	else if((strncmp(array, ">> RESET DIGIT2;", strlen(">> RESET DIGIT2;"))) == 0)
+	{
+		D2 = 0;
+		(*((uint32_t*)DIG2_ADDRESS)) = D2;
+	}
+	else if((strncmp(array, ">> RESET DIGIT3;", strlen(">> RESET DIGIT3;"))) == 0)
+	{
+		D3 = 0;
+		(*((uint32_t*)DIG3_ADDRESS)) = D3;
+	}
+	else if((strncmp(array, ">> RESET DIGIT4;", strlen(">> RESET DIGIT4;"))) == 0)
+	{
+		D4 = 0;
+		(*((uint32_t*)DIG4_ADDRESS)) = D4;
+	}
+	else if((strncmp(array, ">> INCREMENT DIGIT1 ON BTN4;", strlen(">> INCREMENT DIGIT1 ON BTN4;"))) == 0)
+	{
+		//insert handler here
+		Initialize_SVD();
+		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler, NULL);
+	}
+
+
 
 
 		//send echo command that this is not valid
@@ -327,6 +357,7 @@ void checkLEDOFF(int z)
 		return;
 	}
 }
+
 
 
 void enable_interrupts(){
@@ -389,3 +420,93 @@ int k = 0;
 while (k<i)
 k++;
 }
+
+void MyGPIOIRQHandler(void *data)
+{
+//	turnOnLED4();
+	uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
+
+	if(interrupt_ID == 52)
+	{
+		uint32_t GPIO_INT = *((uint32_t*)GPIO_INT_STAT_1);
+		uint32_t button_press = 0xC0000 & GPIO_INT;
+		ButtonHandler(button_press);
+	}
+
+	if(interrupt_ID == 82)
+	{
+	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+	 if (((R & 0x0002) != 0x2)) //if the FIFO is not empty >> //prolly a while
+	 {
+		 //delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
+		 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+						 if (C >= 32)
+						 {
+							//SendChar(C);
+							array[i] = C;
+							SendChar(array[i]); //proves that it's storing in the array correctly
+							i++;
+						 }
+						 if (C == ';')
+						 {
+							 checkLEDON();
+						 }
+
+
+						  //D1++;
+						 // (*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+
+	 }
+	}
+
+	*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+}
+
+void ButtonHandler(uint32_t button_press){
+	uint32_t BTN5=0x80000;
+	uint32_t BTN4=0x40000;
+	delay(100000); // button rebounce
+	if(button_press == BTN4)
+	{
+		D1++;
+	}
+	if(button_press == BTN5)
+	{
+		D1++;
+	}
+	(*((uint32_t*)DIG1_ADDRESS)) = D1;
+	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF; //clearing interrupt status reg
+}
+
+void Configure_IO()
+{
+	*((uint32_t *) 0xF8000000+0x8/4) = 0x0000DF0D; //Write unlock code to enable writing into system level
+		//Control unlock Register
+		*((uint32_t*) MIO_PIN_50) = 0x00000600; // BTN4 6th group of four is: 0110
+		*((uint32_t*) MIO_PIN_51) = 0x00000600; //BTN5 6th group of four is: 0110
+		*((uint32_t*) GPIO_DIRM_0) = 0x00070000; //direction mode for bank 0
+		*((uint32_t*) GPIO_OUTE_0) = 0x00070000; //output enable for bank 0
+		*((uint32_t*) GPIO_DIRM_1) = 0x00000000; //direction mode for bank 1
+		return;
+
+}
+
+void Initialize_GPIO_Interrupts(){
+*((uint32_t*) GPIO_INT_DIS_1) = 0xFFFFFFFF;
+*((uint32_t*) GPIO_INT_DIS_0) = 0xFFFFFFFF;
+*((uint32_t*) GPIO_INT_STAT_1) = 0xFFFFFFFF; // Clear Status register
+*((uint32_t*) GPIO_INT_TYPE_1) = 0x0C0000; // Type of interrupt rising edge
+*((uint32_t*) GPIO_INT_POL_1) = 0x0C0000; // Polarity of interrupt
+*((uint32_t*) GPIO_INT_ANY_1) = 0x000000; // Interrupt any edge sensitivity
+*((uint32_t*) GPIO_INT_EN_1) = 0x0C0000; // Enable interrupts in bank 0
+return;
+}
+
+
+
+//i would be a star if Botched was about broken code
+
+
+
+
