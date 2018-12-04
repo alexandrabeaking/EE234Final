@@ -119,7 +119,7 @@ void configure_GIC()
 *((uint32_t*) ICDDCR_BASEADDR) = 0x0;
 *((uint32_t*) ICDIPR_BASEADDR+13) = 0x000000A0;
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000001;
-*((uint32_t*) ICDICFR_BASEADDR+3) = 0x55555555;
+*((uint32_t*) ICDICFR_BASEADDR+3) = 0x55555555; //GPIO
 *((uint32_t *) ICDISER_BASEADDR+1) = 0x00100000;
 *((uint32_t*) ICCPMR_BASEADDR) = 0xFF;
 *((uint32_t*) ICCICR_BASEADDR) = 0x3;
@@ -136,8 +136,8 @@ void Initialize_UART1(){
 *((uint32_t*)UART_RxFIFO_Trigger) = 0x1; //shown in Reference document,
 // (in line above) trigger set when receiver fifo fills to the # of bytes specified
 *((uint32_t*) UART1_Mode_Addr) = 0x0000030;
-*((uint32_t*) UART1_INT_DIS_Addr) = 0x000FFFF; // Disable interrupt
-*((uint32_t*)UART1_FIFO_Addr) = 0x1;
+//*((uint32_t*) UART1_INT_DIS_Addr) = 0x000FFFF; // Disable interrupt
+*((uint32_t*) UART1_FIFO_Addr) = 0x1;
 *((uint32_t*) UART1_RT_Addr) = 0x1; // Reciever Time out
 *((uint32_t*) UART_INT_DIS) = 0xFEFE; //this enablese the receiver overflow interrupt
 *((uint32_t*) UART_INT_EN) = 0x101;
@@ -262,17 +262,17 @@ void checkLEDON()
 	{
 		turnOffLED1();
 	}
-	else if(((strncmp(array, ">>LED2 OFF;", strlen(">>LED2 OFF;"))) == 0) && (turnOnLED1() == 1))
+	else if(((strncmp(array, ">>LED2 OFF;", strlen(">>LED2 OFF;"))) == 0) && (turnOnLED2() == 1))
 	{
 		turnOffLED1();
 	}
-	else if(((strncmp(array, ">>LED3 OFF;", strlen(">>LED3 OFF;"))) == 0) && (turnOnLED1() == 1))
+	else if(((strncmp(array, ">>LED3 OFF;", strlen(">>LED3 OFF;"))) == 0) && (turnOnLED3() == 1))
 	{
 		turnOffLED1();
 	}
-	else if(((strncmp(array, ">>LED4 OFF;", strlen(">>LED4 OFF;"))) == 0) && (turnOnLED1() == 1))
+	else if(((strncmp(array, ">>LED4 OFF;", strlen(">>LED4 OFF;"))) == 0) && (turnOnLED4() == 1))
 	{
-		turnOffLED1();
+		turnOffLED1(); //need to edit this one
 	}
 	else if((strncmp(array, ">>SVD ON;", strlen(">>SVD ON;"))) == 0)
 	{
@@ -281,6 +281,27 @@ void checkLEDON()
 	else if((strncmp(array, ">>SVD OFF;", strlen(">>SVD OFF;"))) == 0)
 	{
 		UnInitialize_SVD();
+	}
+	else if((strncmp(array, " >> INCREMENT DIGIT1;", strlen( " >> INCREMENT DIGIT1;"))) == 0)
+	{
+		D1++;
+		(*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+	}
+	else if((strncmp(array, " >> INCREMENT DIGIT2;", strlen( " >> INCREMENT DIGIT2;"))) == 0)
+	{
+		D2++;
+		(*((uint32_t*)DIG2_ADDRESS)) = D2;
+	}
+	else if((strncmp(array, " >> INCREMENT DIGIT3;", strlen( " >> INCREMENT DIGIT3;"))) == 0)
+	{
+		D3++;
+		(*((uint32_t*)DIG3_ADDRESS)) = D3;
+	}
+	else if((strncmp(array, " >> INCREMENT DIGIT4;", strlen( " >> INCREMENT DIGIT4;"))) == 0)
+	{
+		D4++;
+		(*((uint32_t*)DIG4_ADDRESS)) = D4;
 	}
 //	else if (((strncmp(array, "LEDx OFF;", 9) == 0))) //&& (turnOnLED() == 1)))
 //	{
