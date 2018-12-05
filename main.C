@@ -482,7 +482,8 @@ void MyGPIOIRQHandler41(void *data)
 
 	 }
 	}
-
+*((uint32_t*)UART_ISR) = 0xFFFFFF;
+	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF;
 	*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
 }
 
