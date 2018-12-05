@@ -46,7 +46,7 @@
 #define SVN_SEG_CTRL 0X4BB03000
 #define DIG1_ADDRESS (0X4BB03000 + 4)
 #define DIG2_ADDRESS (0X4BB03000 + 8)
-#define DIG3_ADDRESS (0X4BB03000 + 12)
+#define DIG3_ADDRESS 0X4BB03012
 #define DIG4_ADDRESS (0X4BB03000 + 16)
 #define SVN_SEG_DP (0X4BB03000 + 20)
 //lab specific registers
@@ -70,10 +70,14 @@
 
 
 void Initialize_UART1();
+void MyGPIOIRQHandler42(void *data);
+void MyGPIOIRQHandler44(void *data);
+void ButtonHandler44(uint32_t button_press);
 void Initialize_SVD();
 void SendChar(uint8_t C);
 void delay(int j);
 void configure_GIC();
+void ButtonHandler43(uint32_t button_press);
 char array[35];
 int i = 0;
 void Initialize_GPIO_Interrupts();
@@ -82,13 +86,15 @@ void Configure_IO();
 int turnOnLED2();
 int turnOnLED4();
 int turnOnLED3();
-void MyGPIOIRQHandler(void *data);
+void MyGPIOIRQHandler41(void *data);
 void turnOffLED1();
 //int turnOnLED();
+void ButtonHandler42(uint32_t button_press);
 void enable_interrupts();
 void UnInitialize_SVD();
 void disable_interrupts();
-void ButtonHandler(uint32_t button_press);
+void MyGPIOIRQHandler43(void *data);
+void ButtonHandler41(uint32_t button_press);
 void IRQ_Handler(void *data);
 void turnOffLED();
 void checkLEDON();
@@ -333,8 +339,25 @@ void checkLEDON()
 	{
 		//insert handler here
 		Initialize_SVD();
-		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler, NULL);
+		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler41, NULL);
 	}
+	else if((strncmp(array, ">> INCREMENT DIGIT2 ON BTN4;", strlen(">> INCREMENT DIGIT2 ON BTN4;"))) == 0)
+	{
+		//insert specific handler here
+		Initialize_SVD();
+		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler42, NULL);
+	}
+	else if((strncmp(array, ">> INCREMENT DIGIT3 ON BTN4;", strlen(">> INCREMENT DIGIT3 ON BTN4;"))) == 0)
+	{
+		Initialize_SVD();
+		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler43, NULL);
+	}
+	else if((strncmp(array, ">> INCREMENT DIGIT4 ON BTN4;", strlen(">> INCREMENT DIGIT2 ON BTN4;"))) == 0)
+	{
+		Initialize_SVD();
+		Xil_ExceptionRegisterHandler(5, MyGPIOIRQHandler44, NULL);
+	}
+
 
 
 
@@ -421,7 +444,7 @@ while (k<i)
 k++;
 }
 
-void MyGPIOIRQHandler(void *data)
+void MyGPIOIRQHandler41(void *data)
 {
 //	turnOnLED4();
 	uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
@@ -430,7 +453,7 @@ void MyGPIOIRQHandler(void *data)
 	{
 		uint32_t GPIO_INT = *((uint32_t*)GPIO_INT_STAT_1);
 		uint32_t button_press = 0xC0000 & GPIO_INT;
-		ButtonHandler(button_press);
+		ButtonHandler41(button_press);
 	}
 
 	if(interrupt_ID == 82)
@@ -463,7 +486,7 @@ void MyGPIOIRQHandler(void *data)
 	*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
 }
 
-void ButtonHandler(uint32_t button_press){
+void ButtonHandler41(uint32_t button_press){
 	uint32_t BTN5=0x80000;
 	uint32_t BTN4=0x40000;
 	delay(100000); // button rebounce
@@ -471,11 +494,186 @@ void ButtonHandler(uint32_t button_press){
 	{
 		D1++;
 	}
-	if(button_press == BTN5)
+	else if(button_press == BTN5)
 	{
-		D1++;
+		;
 	}
 	(*((uint32_t*)DIG1_ADDRESS)) = D1;
+	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF; //clearing interrupt status reg
+}
+
+void MyGPIOIRQHandler42(void *data)
+{
+	uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
+
+		if(interrupt_ID == 52)
+		{
+			uint32_t GPIO_INT = *((uint32_t*)GPIO_INT_STAT_1);
+			uint32_t button_press = 0xC0000 & GPIO_INT;
+			ButtonHandler42(button_press);
+		}
+
+		if(interrupt_ID == 82)
+		{
+		 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+		 if (((R & 0x0002) != 0x2)) //if the FIFO is not empty >> //prolly a while
+		 {
+			 //delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
+			 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+							 if (C >= 32)
+							 {
+								//SendChar(C);
+								array[i] = C;
+								SendChar(array[i]); //proves that it's storing in the array correctly
+								i++;
+							 }
+							 if (C == ';')
+							 {
+								 checkLEDON();
+							 }
+
+
+							  //D1++;
+							 // (*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+
+		 }
+		}
+
+		*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+}
+
+void ButtonHandler42(uint32_t button_press){
+	uint32_t BTN5=0x80000;
+	uint32_t BTN4=0x40000;
+	delay(100000); // button rebounce
+	if(button_press == BTN4)
+	{
+		D2++;
+	}
+	else if(button_press == BTN5)
+	{
+		;
+	}
+	(*((uint32_t*)DIG2_ADDRESS)) = D2;
+	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF; //clearing interrupt status reg
+}
+
+void MyGPIOIRQHandler43(void *data)
+{
+//	turnOnLED4();
+	uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
+
+	if(interrupt_ID == 52)
+	{
+		uint32_t GPIO_INT = *((uint32_t*)GPIO_INT_STAT_1);
+		uint32_t button_press = 0xC0000 & GPIO_INT;
+		ButtonHandler43(button_press);
+	}
+
+	if(interrupt_ID == 82)
+	{
+	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+	 if (((R & 0x0002) != 0x2)) //if the FIFO is not empty >> //prolly a while
+	 {
+		 //delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
+		 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+						 if (C >= 32)
+						 {
+							//SendChar(C);
+							array[i] = C;
+							SendChar(array[i]); //proves that it's storing in the array correctly
+							i++;
+						 }
+						 if (C == ';')
+						 {
+							 checkLEDON();
+						 }
+
+
+						  //D1++;
+						 // (*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+
+	 }
+	}
+
+	*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+}
+
+
+void ButtonHandler43(uint32_t button_press){
+	uint32_t BTN5=0x80000;
+	uint32_t BTN4=0x40000;
+	delay(100000); // button rebounce
+	if(button_press == BTN4)
+	{
+		D3++;
+	}
+	else if(button_press == BTN5)
+	{
+		;
+	}
+	(*((uint32_t*)DIG3_ADDRESS)) = D3;
+	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF; //clearing interrupt status reg
+}
+
+void MyGPIOIRQHandler44(void *data)
+{
+//	turnOnLED4();
+	uint32_t interrupt_ID = *((uint32_t*)ICCIAR_BASEADDR);
+
+	if(interrupt_ID == 52)
+	{
+		uint32_t GPIO_INT = *((uint32_t*)GPIO_INT_STAT_1);
+		uint32_t button_press = 0xC0000 & GPIO_INT;
+		ButtonHandler44(button_press);
+	}
+
+	if(interrupt_ID == 82)
+	{
+	 uint32_t R= *((uint32_t*) UART1_C_Stat_Addr);
+	 if (((R & 0x0002) != 0x2)) //if the FIFO is not empty >> //prolly a while
+	 {
+		 //delay(10000); //because the clock cycle is too fast so it goes through the FIFo twice even though only one interrupt was done
+		 uint8_t C = *((uint32_t*) UART1_FIFO_Addr);
+						 if (C >= 32)
+						 {
+							//SendChar(C);
+							array[i] = C;
+							SendChar(array[i]); //proves that it's storing in the array correctly
+							i++;
+						 }
+						 if (C == ';')
+						 {
+							 checkLEDON();
+						 }
+
+
+						  //D1++;
+						 // (*((uint32_t*)DIG1_ADDRESS)) = D1;
+
+
+	 }
+	}
+
+	*((uint32_t*)ICCEOIR_BASEADDR) = interrupt_ID; // Clears the GIC flag bit.
+}
+
+
+void ButtonHandler44(uint32_t button_press){
+	uint32_t BTN5=0x80000;
+	uint32_t BTN4=0x40000;
+	delay(100000); // button rebounce
+	if(button_press == BTN4)
+	{
+		D4++;
+	}
+	else if(button_press == BTN5)
+	{
+		;
+	}
+	(*((uint32_t*)DIG3_ADDRESS)) = D4;
 	*((uint32_t*)GPIO_INT_STAT_1) = 0xFFFFFF; //clearing interrupt status reg
 }
 
