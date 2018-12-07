@@ -3,6 +3,8 @@
 #include "xil_printf.h"
 #include "xil_exception.h"
 #include "string.h"
+
+//REGISTERS
 #define ICCPMR_BASEADDR 0xF8F00104 // Interrupt Priority Mask Register
 #define ICCICR_BASEADDR 0xF8F00100 // CPU Interface Control Register
 #define ICDDCR_BASEADDR 0xF8F01000 // Distributor Control Register
@@ -55,7 +57,6 @@
 #define DIG2_ADDRESS 0x4BB03008
 #define DIG3_ADDRESS 0x4BB0300C
 #define DIG4_ADDRESS 0x4BB03010
-
 #define SVN_SEG_DP 0x4BB03014
 //lab specific registers
 #define UART1_CON_Addr 0xE0001000
@@ -77,6 +78,7 @@
 #define UART1_TFIFO_LEV_Addr 0xE0001044
 
 
+//FUNCTIONS
 void Initialize_UART1();
 void MyGPIOIRQHandler42(void *data);
 void MyGPIOIRQHandler44(void *data);
@@ -95,8 +97,6 @@ void configure_GIC_GT();
 void delay(int j);
 void configure_GIC();
 void ButtonHandler43(uint32_t button_press);
-char array[35];
-int i = 0;
 void Initialize_GPIO_Interrupts();
 int turnOnLED1();
 void IncDigit(int j);
@@ -119,6 +119,11 @@ void turnOffLED();
 void RstDigit(int s);
 void checkLEDON();
 void checkLEDOFF();
+void AhmedCommand();
+
+//GLOBAL VARIABLES
+char array[35];
+int i = 0;
 uint8_t D1 =0;
 uint8_t D2 =0;
 uint8_t D3 =0;
@@ -135,6 +140,8 @@ int RSTDig1 =0;
 uint8_t D4 =0;
 uint8_t START =0;
 
+
+//MAIN PROGRAM
 int main()
 {
 
@@ -159,7 +166,10 @@ int main()
 	return 0;
 }
 
-//configure button 4/5 as inputs and LED8 as the output
+
+
+
+//FUNCTIONS
 void configure_GIC()
 {
 *((uint32_t*) ICDIPTR_BASEADDR+13) = 0x00000000;
@@ -285,28 +295,28 @@ return;
 }
 
 int turnOnLED1(){
-*((uint32_t*) LED_Base_Address) = 0x00000001;
+*((uint32_t*) LED_Base_Address) = 0x0000000F;
 *((uint32_t*) LED_Base_Address+1)|= 0x00000001;
 return 1;
 }
 
 int turnOnLED2()
 {
-	*((uint32_t*) LED_Base_Address) = 0x00000002;
+	*((uint32_t*) LED_Base_Address) = 0x0000000F;
 	*((uint32_t*) LED_Base_Address+1) |= 0x00000002;
 	return 1;
 }
 
 int turnOnLED3()
 {
-	*((uint32_t*) LED_Base_Address) = 0x00000004;
+	*((uint32_t*) LED_Base_Address) = 0x0000000F;
 	*((uint32_t*) LED_Base_Address+1) |= 0x00000004;
 	return 1;
 }
 
 int turnOnLED4()
 {
-	*((uint32_t*) LED_Base_Address) = 0x00000008;
+	*((uint32_t*) LED_Base_Address) = 0x0000000F;
 	*((uint32_t*) LED_Base_Address+1) |= 0x00000008;
 	return 1;
 }
@@ -338,24 +348,24 @@ void checkLEDON()
 	{
 		turnOffLED1();
 	}
-	else if(((strncmp(array, ">>LED2 OFF;", strlen(">>LED2 OFF;"))) == 0) & (turnOnLED2() == 1))
+	else if(((strncmp(array, ">>LED2 OFF;", strlen(">>LED2 OFF;"))) == 0))
 	{
 		turnOffLED2();
 	}
-	else if(((strncmp(array, ">>LED3 OFF;", strlen(">>LED3 OFF;"))) == 0) & (turnOnLED3() == 1))
+	else if(((strncmp(array, ">>LED3 OFF;", strlen(">>LED3 OFF;"))) == 0))
 	{
 		turnOffLED3();
 	}
-	else if(((strncmp(array, ">>LED4 OFF;", strlen(">>LED4 OFF;"))) == 0) & (turnOnLED4() == 1))
+	else if(((strncmp(array, ">>LED4 OFF;", strlen(">>LED4 OFF;"))) == 0))
 	{
 		turnOffLED4(); //need to edit this one
 	}
 	else if((strncmp(array, ">>SVD ON;", strlen(">>SVD ON;"))) == 0)
 	{
-		turnOnLED2();
+		//turnOnLED2();
 		//Initialize_SVD();
 		Initialize_SVD();
-		turnOnLED3();
+		//turnOnLED3();
 	}
 	else if((strncmp(array, ">>SVD OFF;", strlen(">>SVD OFF;"))) == 0)
 	{
@@ -521,6 +531,10 @@ void checkLEDON()
 		D3 = 0;
 		D4 = 0;
 		Initialize_SVD();
+	}
+	else if((strncmp(array, ">>Lion;", strlen(">>Lion;"))) == 0)
+	{
+		AhmedCommand();
 	}
 	else
 	{
@@ -936,3 +950,17 @@ void Configure_IO()
 		return;
 
 }
+
+void AhmedCommand()
+{
+	*((uint32_t *)SEVENSEG_BASEADDR) = 0x11;
+	*((uint32_t*)DIG1_ADDRESS) = ~(0x38);
+	*((uint32_t*)DIG2_ADDRESS) = ~(0x6);
+	*((uint32_t*)DIG3_ADDRESS) = ~(0x3F);
+	*((uint32_t*)DIG4_ADDRESS) = ~(0x37);
+
+}
+
+
+
+
